@@ -1,0 +1,122 @@
+---
+title: "Quantifying Exercise Quality"
+author: "Christopher Castle"
+output: html_document
+---
+Note: the github repo for this project is available at https://github.com/89million/PML-course-project
+
+This is the course project for Coursera's Practical Machine Learning class. The goal of the project is to create a machine learning algorithm which can predict the quality [on a scale of A-E] of how an exercise is done using measurements from accelerometers on the belt, forearm, arm and dumbell of 6 participants.
+
+We'll start by loading the packages we'll need and the data we'll be using into R. 
+
+```{r, results='hide', warning=FALSE, message=FALSE}
+library(caret)
+library(randomForest)
+library(lattice)
+```
+```{r}
+# read train and test csv
+train = read.csv("./data/pml-training.csv")
+test = read.csv("./data/pml-testing.csv")
+dim(train)
+
+# the X variable looks like a row counter
+length(unique(train$X))
+train$X <- NULL
+test$X <- NULL
+```
+
+#Cleaning the Data
+
+Let's look at the classes of our variables.
+
+```{r}
+table(sapply(train, class))
+head(summary(train$kurtosis_roll_belt))
+```
+
+R seems to have interpreted a number of the measurements in our data as factors. There are a handful of ways to fix this but we'll loop over the data frame to convert each factor to numeric type.
+
+```{r, warning=FALSE}
+# convert factor variables to numeric, excluding the final response var
+for (i in (seq_len(dim(train)[2])-1) ) {
+      if (class(train[,i]) == "factor"){
+            train[,i] <- as.numeric(as.character(train[,i]))}}
+```
+
+Now let's see how many missing values there are. We'll look at this as a ratio of NA values over the total number of cells in our data frame.
+
+```{r}
+sum(is.na(train)) / (dim(train)[1] * dim(train)[2])
+```
+
+Quite a bit of data is missing. Let's look at a sum of the total missing data by column to see how it's distributed. 
+```{r}
+# there are a lot of NA's, many entries are "#DIV/0!"
+# find vars that have a lot of data relative to total rows
+NA.store <- sapply(train, function(x) sum(is.na(x)))
+hist(NA.store, main="Distribution of Missing Values")
+```
+
+We can clearly see that the missing values are not distributed uniformly across the variables. Some variables are almost entirely missing any measurement while others are nearly complete. Rather than trying to impute any values to our missing data we'll remove the variables that have over 95% NA values. 
+
+```{r}
+# store the names of variables with over 95% NA values
+junk <- NA.store[NA.store / dim(train)[1] > .95]
+junk.names <- names(junk)
+
+# remove NA filled variables from train and test
+train <- train[,-which(names(train) %in% junk.names)]
+test <- test[,-which(names(test) %in% junk.names)]
+table(sapply(train, function(x) sum(is.na(x)))) # verify NA heavy vars are deleted
+```
+
+#Exploratory Data Anaysis
+
+Let's do some EDA to see how variables are different between classes. The variables with a lot of variation between classes will be better predictors. There are 55 possible predictors so we'll look at just a few for this report.  
+
+```{r, fig.width=13, fig.height=7}
+# See how density changes by class for an example variable
+densityplot(~ roll_forearm | classe, train)
+# feature plot to see variation among classe for a few variables. Scale them first.    
+featurePlot(scale(train[,16:20]), train$classe)
+```
+
+At first glance these plots look acceptable. If we think reducing some predictors will improve our model we may come back to this method to help us guide our dimensional reduction but for the moment we'll move on. 
+
+#Training the Model
+
+We'll use the caret package to split our data into new train and test subsets of the original training data. The new training set will consist of a randomly sampled 70% of the original training data. The remainder will be our new test set. Then we'll build a randomForest model and train it using 10-fold cross validation. Choosing 10 folds should be sufficient to prevent model over-fitting without increasing the variance too much as is possible with leave-one-out CV. 
+
+```{r}
+# partition new training and test data
+set.seed(10)
+inTrain <- createDataPartition(train$classe, p=.7, list=FALSE)
+xTrain <- train[inTrain,]
+xTest <- train[-inTrain,]
+
+# use 5 fold cross validation to train the model
+fitControl <- trainControl(
+      method = "cv",
+      number = 10)
+
+# fit the model to xTrain subset
+fit <- train(classe ~., method='rf', ntree=100, trControl=fitControl, data=xTrain)
+fit$finalModel
+```
+
+The predicted accuracy of this model is very high according to the Out-of-Bag estimate. We'll use our test subset to verify the accuracy. 
+
+```{r}
+# predict values on xTest subset
+preds <- predict(fit$finalModel, newdata = xTest)
+cMat <- confusionMatrix(preds, xTest$classe)
+cMat
+```
+
+This seems to confirm our original estimates. The 95% confidence interval for accuracy is between `r round(cMat[[3]][3],4)` and `r round(cMat[[3]][4], 4)`. 
+
+```{r}
+# predict classe for the original coursera test set
+test.predictions <- predict(fit$finalModel, newdata=test)
+```
