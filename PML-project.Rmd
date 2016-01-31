@@ -132,4 +132,4 @@ lower.acc <- round(cMat[[3]][3], 4)
 upper.acc <- round(cMat[[3]][4], 4)
 ```
 
-This seems to confirm our original estimates. The 95% confidence interval for accuracy is between `r lower.acc` and `r upper.acc`. This corresponds to an error rate of `1- r acc` with an interval of `r 1- lower.acc` to `r 1 - upper.acc`.
+This seems to confirm our original estimates. The 95% confidence interval for accuracy is between `r lower.acc` and `r upper.acc`. This corresponds to an error rate of `r 1-acc` with an interval of `r 1- lower.acc` to `r 1 - upper.acc`.
