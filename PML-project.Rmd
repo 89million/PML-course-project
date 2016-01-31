@@ -5,6 +5,10 @@ output:
       html_document:
             keep_md: true
 ---
+Note: I'm including links to the github repo and gh-pages link for this project.
+Github repo: https://github.com/89million/PML-course-project
+gh-pages url: http://89million.github.io/PML-course-project-html/
+
 
 This is the course project for Coursera's Practical Machine Learning class. The goal of the project is to create a machine learning algorithm which can predict the quality [on a scale of A-E] of how a barbell lift exercise was done using measurements from accelerometers on the belt, forearm, arm and dumbell of 6 participants.
 
